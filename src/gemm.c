@@ -2,7 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <time.h>
 #include <arm_neon.h>
+
+#define GEMM_FLOPS_CALCULATE_ENABLE     0
+#define CPU_GFLPOS_MAX_VALUE            11.98
 
 void gemm_conv2d(const float* col_matrix,        // [patch_num][patch_size]
                  const float* weight_matrix,     // [out_channels][patch_size]
@@ -11,6 +15,11 @@ void gemm_conv2d(const float* col_matrix,        // [patch_num][patch_size]
                  int patch_size,                 // = C * kH * kW
                  int out_channels)               // = num_output_channels
 {
+#if GEMM_FLOPS_CALCULATE_ENABLE
+    clock_t start, end;
+    double gflops_total = (float)patch_num * out_channels * patch_size * 2 * 1e-9;
+    start = clock();
+#endif
     for (int i = 0; i < patch_num; ++i) {
         for (int oc = 0; oc < out_channels; ++oc) {
             float sum = 0.f;
@@ -20,6 +29,12 @@ void gemm_conv2d(const float* col_matrix,        // [patch_num][patch_size]
             output[i * out_channels + oc] = sum;
         }
     }
+#if GEMM_FLOPS_CALCULATE_ENABLE
+    end = clock();
+    double time = (double)(end - start) / CLOCKS_PER_SEC;
+    double gflops = gflops_total / time;
+    printf("gflops_total %f time:%f gflops:%f hardware utilization%.2f%%\n", gflops_total, time, gflops, gflops / CPU_GFLPOS_MAX_VALUE * 100);
+#endif
 }
 
 void gemm_conv2d_neon(const float *col_matrix,    // [patch_num][patch_size]
@@ -33,6 +48,12 @@ void gemm_conv2d_neon(const float *col_matrix,    // [patch_num][patch_size]
     int neon_remain = patch_size & 3;
     const float *col_matrix_ptr = NULL;
     const float *weight_matrix_ptr = NULL;
+
+#if GEMM_FLOPS_CALCULATE_ENABLE
+    clock_t start, end;
+    double gflops_total = (float)patch_num * out_channels * patch_size * 2 * 1e-9;
+    start = clock();
+#endif
 
     for (int i = 0; i < patch_num; ++i) {
         for (int oc = 0; oc < out_channels; ++oc) {
@@ -61,6 +82,13 @@ void gemm_conv2d_neon(const float *col_matrix,    // [patch_num][patch_size]
             output[i * out_channels + oc] = sum;
         }
     }
+
+#if GEMM_FLOPS_CALCULATE_ENABLE
+    end = clock();
+    double time = (double)(end - start) / CLOCKS_PER_SEC;
+    double gflops = gflops_total / time;
+    printf("gflops_total %f time:%f gflops:%f hardware utilization%.2f%%\n", gflops_total, time, gflops, gflops / CPU_GFLPOS_MAX_VALUE * 100);
+#endif
 }
 
 void gemm_conv2d_neon_v2(const float *col_matrix,    // [patch_num][patch_size]
@@ -74,7 +102,11 @@ void gemm_conv2d_neon_v2(const float *col_matrix,    // [patch_num][patch_size]
     // int neon_remain = patch_size & 3;
     const float *col_matrix_ptr = NULL;
     const float *weight_matrix_ptr = NULL;
-
+#if GEMM_FLOPS_CALCULATE_ENABLE
+    clock_t start, end;
+    double gflops_total = (float)patch_num * out_channels * patch_size * 2 * 1e-9;
+    start = clock();
+#endif
     for (int i = 0; i < patch_num; ++i) {
         for (int oc = 0; oc < out_channels; oc += 4) {
             float32x4_t sum_vec0 = vdupq_n_f32(0.f);
@@ -114,4 +146,10 @@ void gemm_conv2d_neon_v2(const float *col_matrix,    // [patch_num][patch_size]
             vst1q_f32(&output[i * out_channels + oc], vld1q_f32(sum));
         }
     }
+#if GEMM_FLOPS_CALCULATE_ENABLE
+    end = clock();
+    double time = (double)(end - start) / CLOCKS_PER_SEC;
+    double gflops = gflops_total / time;
+    printf("gflops_total %f time:%f gflops:%f hardware utilization%.2f%%\n", gflops_total, time, gflops, gflops / CPU_GFLPOS_MAX_VALUE * 100);
+#endif
 }

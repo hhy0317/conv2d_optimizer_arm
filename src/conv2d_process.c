@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 #include <arm_neon.h>
 
 #define DEBUG_LOG_ENABLE    0
@@ -11,6 +12,10 @@
 #ifndef ALIGNED_ADDR_BYTE
 #define ALIGNED_ADDR_BYTE   16
 #endif
+
+#define FLOPS_CALCULATE_ENABLE  0
+
+#define CPU_FLOPS_MAX           11.98
 
 static inline void pld(const void *ptr)
 {
@@ -146,7 +151,11 @@ void conv2d_process_basic(const float *input,
     printf("pad_h:%d,pad_w:%d\n", pad_h, pad_w);
     printf("output_size:%d,%d,%d,%d\n", output_size[0], output_size[1], output_size[2], output_size[3]);
 #endif
-
+#if FLOPS_CALCULATE_ENABLE
+    clock_t start, end;
+    double gflops_total = shape_n * output_channel * output_size[2] * output_size[3] * (shape_c * kernel_h * kernel_w * 2 + 1) * 1e-9;
+    start = clock();
+#endif
     for (int n = 0; n < shape_n; n++)
     {
         for (int c = 0; c < output_channel; c++)
@@ -178,6 +187,13 @@ void conv2d_process_basic(const float *input,
             }
         }
     }
+
+#if FLOPS_CALCULATE_ENABLE
+    end = clock();
+    double time = (double)(end - start) / CLOCKS_PER_SEC;
+    double gflops = gflops_total / time;
+    printf("gflops_total %f time:%f gflops:%f hardware utilization%.2f%%\n", gflops_total, time, gflops, gflops / CPU_FLOPS_MAX * 100);
+#endif
 }
 
 // NHWC版本
@@ -234,6 +250,12 @@ void conv2d_process_basic_nhwc(const float *input,
     float *output_nhwc_ptr = NULL;
     posix_memalign((void **)&output_nhwc_ptr, ALIGNED_ADDR_BYTE, shape_n * output_channel * output_size[2] * output_size[3] * sizeof(float));
 
+#if FLOPS_CALCULATE_ENABLE
+    clock_t start, end;
+    double gflops_total = shape_n * output_channel * output_size[2] * output_size[3] * (shape_c * kernel_h * kernel_w * 2 + 1) * 1e-9;
+    start = clock();
+#endif
+
     // NHWC版本计算卷积
     for (int n = 0; n < shape_n; n++)
     {
@@ -265,6 +287,13 @@ void conv2d_process_basic_nhwc(const float *input,
             }
         }
     }
+
+#if FLOPS_CALCULATE_ENABLE
+    end = clock();
+    double time = (double)(end - start) / CLOCKS_PER_SEC;
+    double gflops = gflops_total / time;
+    printf("gflops_total %f time:%f gflops:%f hardware utilization%.2f%%\n", gflops_total, time, gflops, gflops / CPU_FLOPS_MAX * 100);
+#endif
 
     nhwc_to_nchw(output_nhwc_ptr, output, shape_n, output_channel, output_size[2], output_size[3]);
 
@@ -333,6 +362,11 @@ void conv2d_process_neon_nhwc(const float *input,
     float *output_nhwc_ptr = NULL;
     posix_memalign((void **)&output_nhwc_ptr, ALIGNED_ADDR_BYTE, shape_n * output_channel * output_size[2] * output_size[3] * sizeof(float));
 
+#if FLOPS_CALCULATE_ENABLE
+    clock_t start, end;
+    double gflops_total = shape_n * output_channel * output_size[2] * output_size[3] * (shape_c * kernel_h * kernel_w * 2 + 1) * 1e-9;
+    start = clock();
+#endif
     // NHWC版本计算卷积
     for (int n = 0; n < shape_n; n++)
     {
@@ -384,6 +418,13 @@ void conv2d_process_neon_nhwc(const float *input,
             }
         }
     }
+
+#if FLOPS_CALCULATE_ENABLE
+    end = clock();
+    double time = (double)(end - start) / CLOCKS_PER_SEC;
+    double gflops = gflops_total / time;
+    printf("gflops_total %f time:%f gflops:%f hardware utilization%.2f%%\n", gflops_total, time, gflops, gflops / CPU_FLOPS_MAX * 100);
+#endif
 
     nhwc_to_nchw(output_nhwc_ptr, output, shape_n, output_channel, output_size[2], output_size[3]);
 
@@ -451,6 +492,11 @@ void conv2d_process_neon_pld_nhwc(const float *input,
     float *output_nhwc_ptr = NULL;
     posix_memalign((void **)&output_nhwc_ptr, ALIGNED_ADDR_BYTE, shape_n * output_channel * output_size[2] * output_size[3] * sizeof(float));
 
+#if FLOPS_CALCULATE_ENABLE
+    clock_t start, end;
+    double gflops_total = shape_n * output_channel * output_size[2] * output_size[3] * (shape_c * kernel_h * kernel_w * 2 + 1) * 1e-9;
+    start = clock();
+#endif
     // NHWC版本计算卷积
     for (int n = 0; n < shape_n; n++)
     {
@@ -506,6 +552,12 @@ void conv2d_process_neon_pld_nhwc(const float *input,
             }
         }
     }
+#if FLOPS_CALCULATE_ENABLE
+    end = clock();
+    double time = (double)(end - start) / CLOCKS_PER_SEC;
+    double gflops = gflops_total / time;
+    printf("gflops_total %f time:%f gflops:%f hardware utilization%.2f%%\n", gflops_total, time, gflops, gflops / CPU_FLOPS_MAX * 100);
+#endif
 
     nhwc_to_nchw(output_nhwc_ptr, output, shape_n, output_channel, output_size[2], output_size[3]);
 
@@ -555,7 +607,9 @@ void conv2d_process_neon_v2_nhwc(const float *input,
 #endif
 
     int neno_loop = shape_c >> 2;
+#if 0
     int neno_loop_remain = shape_c & 3;
+#endif
     float *tmp_input_ic_ptr = NULL;
     float *tmp_weight_ic_ptr = NULL;
 
@@ -578,6 +632,12 @@ void conv2d_process_neon_v2_nhwc(const float *input,
 
     float *output_nhwc_ptr = NULL;
     posix_memalign((void **)&output_nhwc_ptr, ALIGNED_ADDR_BYTE, shape_n * output_channel * output_size[2] * output_size[3] * sizeof(float));
+
+#if FLOPS_CALCULATE_ENABLE
+    clock_t start, end;
+    double gflops_total = shape_n * output_channel * output_size[2] * output_size[3] * (shape_c * kernel_h * kernel_w * 2 + 1) * 1e-9;
+    start = clock();
+#endif
 
     // NHWC版本计算卷积
     for (int n = 0; n < shape_n; n++)
@@ -631,7 +691,7 @@ void conv2d_process_neon_v2_nhwc(const float *input,
                                          vgetq_lane_f32(sum_vec2, 2) + vgetq_lane_f32(sum_vec2, 3) + bias[c + 2];
                                 sum[3] = vgetq_lane_f32(sum_vec3, 0) + vgetq_lane_f32(sum_vec3, 1) +
                                          vgetq_lane_f32(sum_vec3, 2) + vgetq_lane_f32(sum_vec3, 3) + bias[c + 3];
-
+#if 0
                                 for (int re = neno_loop_remain; re > 0; re--)
                                 {
                                     sum[0] += *tmp_input_ic_ptr * *tmp_weight_ic_ptr;
@@ -642,6 +702,7 @@ void conv2d_process_neon_v2_nhwc(const float *input,
                                     tmp_input_ic_ptr++;
                                     tmp_weight_ic_ptr++;
                                 }
+#endif
                             }
                         }
                     }
@@ -649,7 +710,7 @@ void conv2d_process_neon_v2_nhwc(const float *input,
                     // 输出赋值:NHWC版本
                     vst1q_f32(&output_nhwc_ptr[n * output_size[2] * output_size[3] * output_channel + h * output_size[3] * output_channel + w * output_channel + c], vld1q_f32(sum));
                 }
-
+#if 0
                 for (int c = output_channel_count; c < output_channel; c++)
                 {
                     float32x4_t sum_vec = vdupq_n_f32(0.0f);
@@ -695,9 +756,17 @@ void conv2d_process_neon_v2_nhwc(const float *input,
                     // 输出赋值:NHWC版本
                     output_nhwc_ptr[n * output_size[2] * output_size[3] * output_channel + h * output_size[3] * output_channel + w * output_channel + c] = sum + bias[c];
                 }
+#endif
             }
         }
     }
+
+#if FLOPS_CALCULATE_ENABLE
+    end = clock();
+    double time = (double)(end - start) / CLOCKS_PER_SEC;
+    double gflops = gflops_total / time;
+    printf("gflops_total %f time:%f gflops:%f hardware utilization%.2f%%\n", gflops_total, time, gflops, gflops / CPU_FLOPS_MAX * 100);
+#endif
 
     nhwc_to_nchw(output_nhwc_ptr, output, shape_n, output_channel, output_size[2], output_size[3]);
 

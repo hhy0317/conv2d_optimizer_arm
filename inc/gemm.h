@@ -2,8 +2,8 @@
 #define GEMM_H
 
 #define GEMM_MODE_BASE      0   // 朴素实现
-#define GEMM_MODE_NEON      1   // NEON并行实现
-#define GEMM_MODE_NEON_V2   2   // 块实现
+#define GEMM_MODE_NEON      1   // NEON并行实现，行并行
+#define GEMM_MODE_NEON_V2   2   // NEON并行实现，行并行+列并行
 
 #define GEMM_MODE           GEMM_MODE_NEON_V2
 
